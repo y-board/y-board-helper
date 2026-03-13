@@ -1,0 +1,29 @@
+{
+    "name": "Y-Board v4 Helper",
+    "version": "1.0.0",
+    "description": "A helper library for interacting with version 4 of the Y-Board hardware",
+    "keywords": "education, y-board",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/y-board/y-board-helper.git"
+    },
+    "authors": [
+        {
+            "name": "Philip Lundrigan",
+            "email": "lundrigan@byu.edu",
+            "url": "https://philip.lundrigan.org",
+            "maintainer": true
+        }
+    ],
+    "license": "MIT",
+    "homepage": "https://y-board.github.io",
+    "dependencies": {
+        "y-board-v4": "https://github.com/y-board/y-board-v4"
+    },
+    "frameworks": [
+        "arduino"
+    ],
+    "platforms": [
+        "espressif32"
+    ]
+}
