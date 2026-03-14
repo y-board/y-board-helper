@@ -7,22 +7,43 @@
 // =====================================================================
 
 int yboard_microphone_level(const int sample_count) {
-    static int16_t buffer[sample_count];
-    size_t bytes_to_read = (size_t)sample_count * sizeof(int16_t);
-    size_t bytes_read = Yboard.get_microphone_stream().readBytes((uint8_t *)buffer, bytes_to_read);
-    int samples_read = (int)(bytes_read / sizeof(int16_t));
-    if (samples_read <= 0) {
+    if (sample_count <= 0) {
         return 0;
     }
-    long total = 0;
-    for (int i = 0; i < samples_read; i++) {
-        int value = (int)buffer[i];
-        if (value < 0) {
-            value = -value;
+
+    constexpr int max_samples = 512;
+    static int16_t buffer[max_samples];
+    int remaining_samples = sample_count;
+    int total_samples_read = 0;
+    long long total = 0;
+
+    while (remaining_samples > 0) {
+        int chunk_samples = (remaining_samples > max_samples) ? max_samples : remaining_samples;
+        size_t bytes_to_read = (size_t)chunk_samples * sizeof(int16_t);
+        size_t bytes_read =
+            Yboard.get_microphone_stream().readBytes((uint8_t *)buffer, bytes_to_read);
+        int samples_read = (int)(bytes_read / sizeof(int16_t));
+        if (samples_read <= 0) {
+            break;
         }
-        total += value;
+
+        for (int i = 0; i < samples_read; i++) {
+            int value = (int)buffer[i];
+            if (value < 0) {
+                value = -value;
+            }
+            total += value;
+        }
+
+        total_samples_read += samples_read;
+        remaining_samples -= samples_read;
     }
-    return (int)(total / samples_read);
+
+    if (total_samples_read <= 0) {
+        return 0;
+    }
+
+    return (int)(total / total_samples_read);
 }
 
 bool yboard_is_loud_noise(int threshold) { return yboard_microphone_level(128) >= threshold; }
