@@ -57,6 +57,31 @@ float yboard_accel_magnitude() {
     return sqrt(a.x * a.x + a.y * a.y + a.z * a.z);
 }
 
+bool yboard_orientation_check(yboard_orientation orientation) {
+    accelerometer_data a = Yboard.get_accelerometer();
+
+    switch (orientation) {
+    case YBOARD_ORIENTATION_SHAKE:
+        return fabs(yboard_accel_magnitude() - 1000.0f) > 600.0f;
+    case YBOARD_ORIENTATION_FACE_UP:
+        return a.z > 700;
+    case YBOARD_ORIENTATION_FACE_DOWN:
+        return a.z < -700;
+    case YBOARD_ORIENTATION_FLAT:
+        return fabs(a.z) > 700 && fabs(a.x) < 400 && fabs(a.y) < 400;
+    case YBOARD_ORIENTATION_ON_SIDE:
+        return fabs(a.x) > 700;
+    case YBOARD_ORIENTATION_TILT_LEFT:
+        return a.x < -300;
+    case YBOARD_ORIENTATION_TILT_RIGHT:
+        return a.x > 300;
+    case YBOARD_ORIENTATION_UPRIGHT:
+        return fabs(a.y) > 700;
+    default:
+        return false;
+    }
+}
+
 // =====================================================================
 // LED effect helpers
 // =====================================================================

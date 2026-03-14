@@ -20,8 +20,22 @@ bool yboard_is_loud_noise(int threshold);
 
 // --- Accelerometer helpers ---
 
+enum yboard_orientation {
+    YBOARD_ORIENTATION_SHAKE,
+    YBOARD_ORIENTATION_FACE_UP,
+    YBOARD_ORIENTATION_FACE_DOWN,
+    YBOARD_ORIENTATION_FLAT,
+    YBOARD_ORIENTATION_ON_SIDE,
+    YBOARD_ORIENTATION_TILT_LEFT,
+    YBOARD_ORIENTATION_TILT_RIGHT,
+    YBOARD_ORIENTATION_UPRIGHT,
+};
+
 // Compute the total acceleration magnitude in milliGs (1000 mG ≈ 1g at rest).
 float yboard_accel_magnitude();
+
+// Check whether the board matches a target orientation / motion state.
+bool yboard_orientation_check(yboard_orientation orientation);
 
 // --- LED effect helpers ---
 
