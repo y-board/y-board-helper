@@ -6,6 +6,7 @@
 #define YBOARD_HELPER_H
 
 #include "yboard.h"
+#include "yboard_radio.h"
 #include <math.h>
 
 // --- Microphone helpers ---
