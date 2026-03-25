@@ -18,32 +18,32 @@
 #include "yboard_radio.h"
 #include <Arduino.h>
 #include <WiFi.h>
+#include <esp_idf_version.h>
 #include <esp_now.h>
 #include <esp_wifi.h>
-#include <esp_idf_version.h>
 #include <string.h>
 
-#define MAGIC_LO       0x42  // 'B'
-#define MAGIC_HI       0x59  // 'Y'
-#define TYPE_NUMBER    0
-#define TYPE_STRING    1
-#define TYPE_VALUE     2
-#define HEADER_SIZE    9
+#define MAGIC_LO 0x42 // 'B'
+#define MAGIC_HI 0x59 // 'Y'
+#define TYPE_NUMBER 0
+#define TYPE_STRING 1
+#define TYPE_VALUE 2
+#define HEADER_SIZE 9
 #define MAX_STRING_LEN 32
-#define MAX_NAME_LEN   12
-#define MAX_PAYLOAD    (250 - HEADER_SIZE)
+#define MAX_NAME_LEN 12
+#define MAX_PAYLOAD (250 - HEADER_SIZE)
 
 static const uint8_t kBroadcastAddr[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 
 // --- Module state ---
 
-static uint8_t  s_group       = 0;
-static uint8_t  s_pkt_counter = 0;
-static uint32_t s_serial      = 0;
-static int      s_last_rssi   = 0;
+static uint8_t s_group = 0;
+static uint8_t s_pkt_counter = 0;
+static uint32_t s_serial = 0;
+static int s_last_rssi = 0;
 
-static void (*s_on_number)(float)              = nullptr;
-static void (*s_on_string)(const char *)       = nullptr;
+static void (*s_on_number)(float) = nullptr;
+static void (*s_on_string)(const char *) = nullptr;
 static void (*s_on_value)(const char *, float) = nullptr;
 
 // --- Deduplication cache ---
@@ -54,14 +54,16 @@ static void (*s_on_value)(const char *, float) = nullptr;
 #define DEDUP_SIZE 16
 static struct {
     uint32_t serial;
-    uint8_t  counter;
-    bool     valid;
+    uint8_t counter;
+    bool valid;
 } s_dedup[DEDUP_SIZE];
 
 static bool dedup_is_new(uint32_t serial, uint8_t counter) {
     for (int i = 0; i < DEDUP_SIZE; i++) {
         if (s_dedup[i].valid && s_dedup[i].serial == serial) {
-            if (s_dedup[i].counter == counter) return false;
+            if (s_dedup[i].counter == counter) {
+                return false;
+            }
             s_dedup[i].counter = counter;
             return true;
         }
@@ -72,7 +74,9 @@ static bool dedup_is_new(uint32_t serial, uint8_t counter) {
             return true;
         }
     }
-    for (int i = 0; i < DEDUP_SIZE - 1; i++) s_dedup[i] = s_dedup[i + 1];
+    for (int i = 0; i < DEDUP_SIZE - 1; i++) {
+        s_dedup[i] = s_dedup[i + 1];
+    }
     s_dedup[DEDUP_SIZE - 1] = {serial, counter, true};
     return true;
 }
@@ -80,17 +84,27 @@ static bool dedup_is_new(uint32_t serial, uint8_t counter) {
 // --- Packet dispatch (shared by both callback signatures) ---
 
 static void dispatch(const uint8_t *data, int len) {
-    if (len < HEADER_SIZE)                               return;
-    if (data[0] != MAGIC_LO || data[1] != MAGIC_HI)     return;
-    if (data[2] != s_group)                              return;
+    if (len < HEADER_SIZE) {
+        return;
+    }
+    if (data[0] != MAGIC_LO || data[1] != MAGIC_HI) {
+        return;
+    }
+    if (data[2] != s_group) {
+        return;
+    }
 
     uint32_t sender;
     memcpy(&sender, data + 4, 4);
-    if (sender == s_serial)                              return;
-    if (!dedup_is_new(sender, data[3]))                  return;
+    if (sender == s_serial) {
+        return;
+    }
+    if (!dedup_is_new(sender, data[3])) {
+        return;
+    }
 
-    uint8_t        type    = data[8];
-    size_t         plen    = (size_t)len - HEADER_SIZE;
+    uint8_t type = data[8];
+    size_t plen = (size_t)len - HEADER_SIZE;
     const uint8_t *payload = data + HEADER_SIZE;
 
     if (type == TYPE_NUMBER && plen >= 4 && s_on_number) {
@@ -119,8 +133,7 @@ static void dispatch(const uint8_t *data, int len) {
 // The callback signature changed in ESP-IDF 5.0; handle both.
 
 #if ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(5, 0, 0)
-static void on_receive(const esp_now_recv_info_t *info,
-                       const uint8_t *data, int len) {
+static void on_receive(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
     s_last_rssi = info->rx_ctrl->rssi;
     dispatch(data, len);
 }
@@ -164,7 +177,9 @@ void yboard_radio_set_power(uint8_t power) {
 }
 
 static void send_packet(uint8_t type, const uint8_t *payload, size_t plen) {
-    if (plen > (size_t)MAX_PAYLOAD) plen = MAX_PAYLOAD;
+    if (plen > (size_t)MAX_PAYLOAD) {
+        plen = MAX_PAYLOAD;
+    }
 
     uint8_t buf[HEADER_SIZE + MAX_PAYLOAD];
     buf[0] = MAGIC_LO;
@@ -196,8 +211,8 @@ void yboard_radio_send_value(const char *name, float value) {
     send_packet(TYPE_VALUE, payload, MAX_NAME_LEN + 4);
 }
 
-void yboard_radio_on_number(void (*cb)(float))              { s_on_number = cb; }
-void yboard_radio_on_string(void (*cb)(const char *))       { s_on_string = cb; }
-void yboard_radio_on_value(void (*cb)(const char *, float)) { s_on_value  = cb; }
+void yboard_radio_on_number(void (*cb)(float)) { s_on_number = cb; }
+void yboard_radio_on_string(void (*cb)(const char *)) { s_on_string = cb; }
+void yboard_radio_on_value(void (*cb)(const char *, float)) { s_on_value = cb; }
 
-int yboard_radio_received_signal_strength()                 { return s_last_rssi; }
+int yboard_radio_received_signal_strength() { return s_last_rssi; }
