@@ -18,32 +18,32 @@
 //   = 17 bytes available for payload
 
 #include "yboard_radio.h"
-#include <BLEDevice.h>
 #include <BLEAdvertising.h>
+#include <BLEDevice.h>
 #include <BLEScan.h>
 #include <esp_bt.h>
 #include <string.h>
 
 // Company ID 0x4259 = ASCII "BY" (first two letters of BYU), little-endian in packet
-#define COMPANY_ID_LO  0x42  // 'B'
-#define COMPANY_ID_HI  0x59  // 'Y'
-#define TYPE_NUMBER    0
-#define TYPE_STRING    1
-#define TYPE_VALUE     2
-#define HEADER_SIZE    9   // company(2) + group(1) + counter(1) + serial(4) + type(1)
-#define MAX_PAYLOAD    17
-#define MAX_STRING_LEN 16  // MAX_PAYLOAD - 1 null terminator
-#define MAX_NAME_LEN   8   // matches micro:bit MakeCode name field width
+#define COMPANY_ID_LO 0x42 // 'B'
+#define COMPANY_ID_HI 0x59 // 'Y'
+#define TYPE_NUMBER 0
+#define TYPE_STRING 1
+#define TYPE_VALUE 2
+#define HEADER_SIZE 9 // company(2) + group(1) + counter(1) + serial(4) + type(1)
+#define MAX_PAYLOAD 17
+#define MAX_STRING_LEN 16 // MAX_PAYLOAD - 1 null terminator
+#define MAX_NAME_LEN 8    // matches micro:bit MakeCode name field width
 
 // --- Module state ---
 
-static uint8_t  s_group       = 0;
-static uint8_t  s_pkt_counter = 0;
-static uint32_t s_serial      = 0;
-static int      s_last_rssi   = 0;
+static uint8_t s_group = 0;
+static uint8_t s_pkt_counter = 0;
+static uint32_t s_serial = 0;
+static int s_last_rssi = 0;
 
-static void (*s_on_number)(float)              = nullptr;
-static void (*s_on_string)(const char *)       = nullptr;
+static void (*s_on_number)(float) = nullptr;
+static void (*s_on_string)(const char *) = nullptr;
 static void (*s_on_value)(const char *, float) = nullptr;
 
 // --- Deduplication cache ---
@@ -54,14 +54,16 @@ static void (*s_on_value)(const char *, float) = nullptr;
 #define DEDUP_SIZE 16
 static struct {
     uint32_t serial;
-    uint8_t  counter;
-    bool     valid;
+    uint8_t counter;
+    bool valid;
 } s_dedup[DEDUP_SIZE];
 
 static bool dedup_is_new(uint32_t serial, uint8_t counter) {
     for (int i = 0; i < DEDUP_SIZE; i++) {
         if (s_dedup[i].valid && s_dedup[i].serial == serial) {
-            if (s_dedup[i].counter == counter) return false; // already seen
+            if (s_dedup[i].counter == counter) {
+                return false; // already seen
+            }
             s_dedup[i].counter = counter;
             return true;
         }
@@ -85,24 +87,36 @@ static bool dedup_is_new(uint32_t serial, uint8_t counter) {
 
 class RadioScanCallbacks : public BLEAdvertisedDeviceCallbacks {
     void onResult(BLEAdvertisedDevice dev) override {
-        if (!dev.haveManufacturerData()) return;
+        if (!dev.haveManufacturerData()) {
+            return;
+        }
 
-        std::string     mfr = dev.getManufacturerData();
-        const uint8_t  *d   = reinterpret_cast<const uint8_t *>(mfr.data());
+        std::string mfr = dev.getManufacturerData();
+        const uint8_t *d = reinterpret_cast<const uint8_t *>(mfr.data());
 
-        if ((int)mfr.size() < HEADER_SIZE)                    return;
-        if (d[0] != COMPANY_ID_LO || d[1] != COMPANY_ID_HI)  return;
-        if (d[2] != s_group)                                  return;
+        if ((int)mfr.size() < HEADER_SIZE) {
+            return;
+        }
+        if (d[0] != COMPANY_ID_LO || d[1] != COMPANY_ID_HI) {
+            return;
+        }
+        if (d[2] != s_group) {
+            return;
+        }
 
         uint32_t sender;
         memcpy(&sender, d + 4, 4);
-        if (sender == s_serial)                               return; // own packet
+        if (sender == s_serial) {
+            return; // own packet
+        }
 
         uint8_t counter = d[3];
-        if (!dedup_is_new(sender, counter))                   return; // duplicate
+        if (!dedup_is_new(sender, counter)) {
+            return; // duplicate
+        }
 
-        uint8_t        type    = d[8];
-        size_t         plen    = mfr.size() - HEADER_SIZE;
+        uint8_t type = d[8];
+        size_t plen = mfr.size() - HEADER_SIZE;
         const uint8_t *payload = d + HEADER_SIZE;
 
         s_last_rssi = dev.getRSSI();
@@ -131,12 +145,14 @@ class RadioScanCallbacks : public BLEAdvertisedDeviceCallbacks {
 };
 
 static RadioScanCallbacks s_scan_cb;
-static BLEScan           *s_scan = nullptr;
+static BLEScan *s_scan = nullptr;
 
 // --- Internal send helper ---
 
 static void send_packet(uint8_t type, const uint8_t *payload, size_t plen) {
-    if (plen > MAX_PAYLOAD) plen = MAX_PAYLOAD;
+    if (plen > MAX_PAYLOAD) {
+        plen = MAX_PAYLOAD;
+    }
 
     uint8_t buf[HEADER_SIZE + MAX_PAYLOAD];
     buf[0] = COMPANY_ID_LO;
@@ -149,7 +165,7 @@ static void send_packet(uint8_t type, const uint8_t *payload, size_t plen) {
 
     std::string mfr(reinterpret_cast<char *>(buf), HEADER_SIZE + plen);
 
-    BLEAdvertising    *adv = BLEDevice::getAdvertising();
+    BLEAdvertising *adv = BLEDevice::getAdvertising();
     BLEAdvertisementData data;
     data.setManufacturerData(mfr);
     adv->setAdvertisementData(data);
@@ -172,7 +188,7 @@ void yboard_radio_begin() {
     s_scan->setAdvertisedDeviceCallbacks(&s_scan_cb, /*wantDuplicates=*/true);
     s_scan->setActiveScan(false); // passive scan — no scan requests, lower power
     s_scan->setInterval(100);
-    s_scan->setWindow(99);        // listen 99% of the time
+    s_scan->setWindow(99);            // listen 99% of the time
     s_scan->start(0, nullptr, false); // 0 = scan indefinitely
 }
 
@@ -212,8 +228,8 @@ void yboard_radio_send_value(const char *name, float value) {
     send_packet(TYPE_VALUE, payload, MAX_NAME_LEN + 4);
 }
 
-void yboard_radio_on_number(void (*cb)(float))               { s_on_number = cb; }
-void yboard_radio_on_string(void (*cb)(const char *))        { s_on_string = cb; }
-void yboard_radio_on_value(void (*cb)(const char *, float))  { s_on_value  = cb; }
+void yboard_radio_on_number(void (*cb)(float)) { s_on_number = cb; }
+void yboard_radio_on_string(void (*cb)(const char *)) { s_on_string = cb; }
+void yboard_radio_on_value(void (*cb)(const char *, float)) { s_on_value = cb; }
 
-int yboard_radio_received_signal_strength()                  { return s_last_rssi; }
+int yboard_radio_received_signal_strength() { return s_last_rssi; }
