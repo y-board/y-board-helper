@@ -11,7 +11,7 @@
 #ifndef YBOARD_RADIO_H
 #define YBOARD_RADIO_H
 
-#include <stdint.h>
+#include <Arduino.h>
 
 // Initialize the BLE radio. Must be called once in setup() before any other
 // radio functions. Cannot be used alongside other BLE functionality.

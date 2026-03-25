@@ -18,6 +18,7 @@
 //   = 17 bytes available for payload
 
 #include "yboard_radio.h"
+#include <Arduino.h>
 #include <BLEAdvertising.h>
 #include <BLEDevice.h>
 #include <BLEScan.h>
@@ -165,14 +166,21 @@ static void send_packet(uint8_t type, const uint8_t *payload, size_t plen) {
 
     std::string mfr(reinterpret_cast<char *>(buf), HEADER_SIZE + plen);
 
+    // The BLE scan must be stopped before advertising starts; running both
+    // simultaneously on ESP32's Bluedroid stack silently kills the scanner.
+    s_scan->stop();
+
     BLEAdvertising *adv = BLEDevice::getAdvertising();
     BLEAdvertisementData data;
+    data.setFlags(ESP_BLE_ADV_FLAG_GEN_DISC | ESP_BLE_ADV_FLAG_BREDR_NOT_SPT);
     data.setManufacturerData(mfr);
     adv->setAdvertisementData(data);
-    adv->setScanResponse(false);
     adv->start();
     delay(200); // advertise long enough for nearby scanners to receive the packet
     adv->stop();
+
+    // Restart continuous scan.
+    s_scan->start(0, nullptr, false);
 }
 
 // --- Public API ---
