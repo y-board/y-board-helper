@@ -8,7 +8,6 @@
 #include "yboard.h"
 #include "yboard_radio.h"
 #include "yboard_wifi.h"
-#include <math.h>
 
 // --- Microphone helpers ---
 

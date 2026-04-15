@@ -1,5 +1,7 @@
 // ===== Y-Board Helper Functions — Implementation =====
 
+#include <math.h>
+
 #include "yboard_helper.h"
 
 // =====================================================================
